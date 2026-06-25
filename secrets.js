@@ -5,10 +5,16 @@
 
 import * as db from "./db.js";
 
-const DEFAULTS = { owner: "", repo: "", branch: "main", apiBase: "https://api.github.com", device: "phone-yair" };
+const DEFAULTS = { owner: "YaFuchs", repo: "personal-os", branch: "main", apiBase: "https://api.github.com", device: "phone-yair" };
 
 export async function getConfig() {
-  return { ...DEFAULTS, ...((await db.meta.get("github_config")) || {}) };
+  // Empty/blank saved values fall back to the defaults — so a half-filled earlier save (e.g. owner
+  // left blank) doesn't stick as "" and re-trigger "owner/repo not set". The defaults are not secret
+  // (a public GitHub username + a repo name; access still needs the on-device key).
+  const saved = (await db.meta.get("github_config")) || {};
+  const merged = { ...DEFAULTS };
+  for (const [k, v] of Object.entries(saved)) if (v !== "" && v != null) merged[k] = v;
+  return merged;
 }
 export async function setConfig(cfg) {
   const merged = { ...(await getConfig()), ...cfg };

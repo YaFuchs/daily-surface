@@ -77,6 +77,13 @@ async function doSync() {
     state.syncState = res.ok ? "idle" : "error";
     await cachePlan();
     if (!res.ok && res.errors.length) console.warn("sync errors", res.errors);
+    // Connected, but the plan file was not found = wrong repo/branch (the #1 setup slip — a
+    // case-mismatched branch). Tell the user exactly where to look instead of silently doing nothing.
+    if (res.pulled && !res.snapshotFound) {
+      const cfg = await secrets.getConfig();
+      state.syncState = "error";
+      openSettings(`Connected, but no plan found at ${cfg.owner}/${cfg.repo} on branch "${cfg.branch}". Double-check the repo name and branch — they are case-sensitive (the branch should be lowercase "main").`);
+    }
   } catch (e) { state.syncState = "error"; console.warn("sync failed:", e.code || e.message); }
   await refresh();
 }

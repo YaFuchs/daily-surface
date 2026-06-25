@@ -104,14 +104,16 @@ function proseFvFor(proseRows, day) {
   return out;
 }
 
-// The public "Sync now": pull (+prune) then push. lastSynced bumps only on a fully clean push.
+// The public "Sync now": pull (+prune) then push. "synced" requires actually FINDING the snapshot
+// (a 404 — wrong repo/branch — returns null, which must NOT read as a clean sync).
 export async function syncNow() {
   let snapshot = null, pulled = true;
   try { snapshot = await pull(); } catch (e) { pulled = false; if (e.code !== "offline") throw e; }
   const { pushedDays, errors } = await push();
-  if (pulled && errors.length === 0) await db.meta.set("lastSynced", Date.now());
+  const synced = pulled && !!snapshot && errors.length === 0;
+  if (synced) await db.meta.set("lastSynced", Date.now());
   const unsynced = (await db.allEvents()).length;
-  return { ok: pulled && errors.length === 0, pulled, pushedDays, errors, unsynced, snapshot };
+  return { ok: synced, pulled, snapshotFound: !!snapshot, pushedDays, errors, unsynced, snapshot };
 }
 
 export async function lastSynced() { return (await db.meta.get("lastSynced")) || 0; }
