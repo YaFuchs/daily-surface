@@ -1,0 +1,29 @@
+{
+  "_comment": "SYNTHETIC demo data only — this file is the no-key offline fallback and the public shell shows it before a real sync, so it must contain NO real tasks/journal. The real snapshot is fetched from the private repo via the access key at runtime. Safe to publish.",
+  "schema_version": 1,
+  "generated_at": "2026-01-01T08:00:00+02:00",
+  "plan": { "date": "2026-01-01", "source": "surface/pwa/plan.fixture.md", "html": "plans/today.html" },
+  "tasks": [
+    { "id": "demo01", "text": "Read today's plan and pick your one thing", "project": "demo", "priority": "P0", "status": "open" },
+    { "id": "demo02", "text": "Mark a task done — it saves instantly, even offline", "project": "demo", "priority": "P1", "status": "open" },
+    { "id": "demo03", "text": "Defer a task to tomorrow with the skip button", "project": "demo", "priority": "P1", "status": "open" },
+    { "id": "demo04", "text": "Capture a quick note below", "project": "demo", "priority": "P2", "status": "open" },
+    { "id": null, "text": "A task with no id yet — done stays disabled until your Mac mints one", "project": "demo", "priority": "P2", "status": "open" }
+  ],
+  "journal_schema": {
+    "schema_version": "demo",
+    "source": "demo",
+    "sections": [
+      { "name": "Morning", "fields": [
+        { "key": "energy", "label": "Energy", "type": "scale", "hint": "" },
+        { "key": "on_my_mind", "label": "On my mind", "type": "text", "hint": "what's pulling focus" }
+      ] },
+      { "name": "Evening", "fields": [
+        { "key": "wins", "label": "Wins", "type": "text", "hint": "what actually moved" },
+        { "key": "moved_my_body", "label": "Moved my body", "type": "checkbox", "hint": "v=y, x=n" },
+        { "key": "tomorrows_one_thing", "label": "Tomorrow's one thing", "type": "text", "hint": "if only one thing happens tomorrow" }
+      ] }
+    ]
+  },
+  "ack": { "ack_version": 1, "as_of": "2026-01-01T08:00:00+02:00", "devices": { "phone-yair": { "processed_seq": 0 } } }
+}

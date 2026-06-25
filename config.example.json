@@ -1,0 +1,8 @@
+{
+  "_comment": "Throwaway-first config template. The PWA reads its real config from in-app Settings (stored in IndexedDB), NOT from this file — this only documents the shape and lets you point a dev build at a DISPOSABLE test repo before any real repo/PAT. The PAT is entered in the app and never committed.",
+  "owner": "YOUR_GH_USER",
+  "repo": "DISPOSABLE_TEST_REPO",
+  "branch": "main",
+  "device": "phone-test",
+  "apiBase": "https://api.github.com"
+}

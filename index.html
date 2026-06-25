@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Strict CSP (meta-tag form works on GitHub Pages): no inline/eval scripts, NO third-party
+     scripts, and connect-src pinned to api.github.com ONLY — the load-bearing exfil control, so a
+     compromised script could not POST the access key anywhere. Never widen connect-src. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
+<meta name="theme-color" content="#0f1115">
+<meta name="color-scheme" content="dark light">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./app.css">
+<title>Daily Surface</title>
+</head>
+<body>
+<header id="header-mount" class="header"></header>
+
+<main class="stack">
+  <section id="plan-mount" class="panel"></section>
+  <section id="tasks-mount" class="panel"></section>
+  <section id="capture-mount" class="panel"></section>
+  <section id="journal-mount" class="panel"></section>
+  <footer class="foot">
+    <button id="settings-toggle" class="btn ghost small" type="button">⚙ Settings</button>
+    <span class="foot-note">Your data stays in your private repo. The access key lives only on this device.</span>
+  </footer>
+</main>
+
+<div id="settings" class="settings" hidden>
+  <div class="settings-card">
+    <h2>Connect your repo</h2>
+    <p id="settings-msg" class="muted"></p>
+    <label>Owner <input id="cfg-owner" type="text" autocomplete="off" placeholder="YaFuchs"></label>
+    <label>Repo <input id="cfg-repo" type="text" autocomplete="off" placeholder="personal-os"></label>
+    <label>Branch <input id="cfg-branch" type="text" autocomplete="off" value="main"></label>
+    <label>Device id <input id="cfg-device" type="text" autocomplete="off" value="phone-yair"></label>
+    <label>Access key (fine-grained PAT) <input id="cfg-pat" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+    <p id="settings-status" class="muted" aria-live="polite"></p>
+    <div class="settings-row">
+      <button id="settings-save" class="btn" type="button">Save &amp; connect</button>
+      <button id="settings-close" class="btn ghost" type="button">Close</button>
+      <button id="settings-forget" class="btn ghost danger-text" type="button">Forget key</button>
+    </div>
+    <p class="muted tiny">The key is stored only on this device, never in the repo. Revoke it any time on GitHub (see surface/SECURITY.md).</p>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

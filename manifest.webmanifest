@@ -1,0 +1,14 @@
+{
+  "name": "Daily Surface",
+  "short_name": "Surface",
+  "description": "Yair's day, in his pocket — read the plan, check off tasks, capture notes, journal, sync.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
