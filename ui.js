@@ -48,16 +48,44 @@ export function renderPlan(mount, planMarkdown, view) {
 
 export function renderTasks(mount, view, actions) {
   mount.replaceChildren(el("h2", { class: "panel-h", text: "Tasks" }));
-  const groups = {};
-  for (const t of view.tasks) (groups[t.priority || "—"] ||= []).push(t);
-  for (const pr of Object.keys(groups).sort()) {
-    mount.append(el("div", { class: "task-group-h", text: pr }));
-    for (const t of groups[pr]) mount.append(taskRow(t, actions));
+
+  // "Today" = the tasks the plan selected by id (snapshot.today, already validated by
+  // render_snapshot); "Backlog" = everything else, collapsed so the panel opens on the focus set.
+  // Empty/absent today (old snapshot, or nothing pinned) → fall back to the flat priority-grouped
+  // list, so this is never worse than before the split. (DEC-021 §6 / DEC-028.)
+  const todayIds = view.today || [];
+  if (todayIds.length) {
+    const byId = new Map(view.tasks.filter((t) => t.id).map((t) => [t.id, t]));
+    const todayTasks = todayIds.map((id) => byId.get(id)).filter(Boolean);   // planner's order; skip any not present
+    const inToday = new Set(todayTasks);
+    const backlog = view.tasks.filter((t) => !inToday.has(t));
+
+    mount.append(el("div", { class: "task-today-h", text: "Today" }));
+    if (todayTasks.length) for (const t of todayTasks) mount.append(taskRow(t, actions));
+    else mount.append(el("p", { class: "muted tiny", text: "Nothing pinned for today." }));
+
+    if (backlog.length) {
+      const det = el("details", { class: "backlog" });
+      det.append(el("summary", { class: "backlog-sum", text: `Backlog (${backlog.length})` }));
+      appendGrouped(det, backlog, actions);
+      mount.append(det);
+    }
+  } else {
+    appendGrouped(mount, view.tasks, actions);
   }
+
   for (const a of view.addedTasks) {
-    mount.append(el("div", { class: "task-row pending" },
-      el("div", { class: "task-text", dir: "auto" }, ...inline(a.text), el("span", { class: "tag", text: "new · unsynced" })),
-    ));
+    const row = el("div", { class: "task-row pending" },
+      el("div", { class: "task-text", dir: "auto" }, ...inline(a.text),
+        el("span", { class: "tag", text: a.synced ? "new · awaiting confirm" : "new · unsynced" })),
+    );
+    // A just-added task has no stable id and no undo/edit verb (DEC-024 pending). The one thing it
+    // CAN do before sync is be cancelled — drop the un-synced event from the outbox.
+    if (a.synced === 0 && a.key) {
+      row.append(el("button", { class: "task-cancel", title: "Cancel — remove this un-synced task",
+        "aria-label": "cancel task", onclick: () => actions.cancelLocal(a.key), text: "×" }));
+    }
+    mount.append(row);
   }
   // add-task
   const input = el("input", { class: "add-input", type: "text", placeholder: "Add a task…", "aria-label": "Add a task" });
@@ -67,15 +95,28 @@ export function renderTasks(mount, view, actions) {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
 }
 
+function appendGrouped(mount, tasks, actions) {
+  const groups = {};
+  for (const t of tasks) (groups[t.priority || "—"] ||= []).push(t);
+  for (const pr of Object.keys(groups).sort()) {
+    mount.append(el("div", { class: "task-group-h", text: pr }));
+    for (const t of groups[pr]) mount.append(taskRow(t, actions));
+  }
+}
+
 function taskRow(t, actions) {
   const done = t.status === "done";
   const deferred = t.status === "deferred";
   const noId = !t.id;
+  const undoable = done && t._doneSynced === 0 && t._doneKey;   // un-synced completion → tap to undo (DEC-023b)
   const row = el("div", { class: `task-row${done ? " done" : ""}${deferred ? " deferred" : ""}` });
   const checkbox = el("button", {
-    class: "task-check", "aria-label": done ? "done" : "mark done",
-    disabled: noId || done, title: noId ? "No stable id yet — sync first" : "",
-    onclick: () => actions.markDone(t.id), text: done ? "✓" : "○",
+    class: "task-check",
+    "aria-label": done ? (undoable ? "undo done" : "done") : "mark done",
+    disabled: noId || (done && !undoable),
+    title: noId ? "No stable id yet — sync first" : undoable ? "Tap to undo — not synced yet" : "",
+    onclick: () => { if (undoable) actions.cancelLocal(t._doneKey); else if (!done) actions.markDone(t.id); },
+    text: done ? "✓" : "○",
   });
   const text = el("div", { class: "task-text", dir: "auto" }, ...inline(t.text));
   if (t._localPending) text.append(el("span", { class: "tag", text: "unsynced" }));
@@ -94,7 +135,13 @@ export function renderCapture(mount, view, actions) {
   const save = () => { const v = ta.value.trim(); if (v) { actions.addNote(v); ta.value = ""; } };
   mount.append(ta, el("button", { class: "btn small", onclick: save, text: "Save note" }));
   for (const n of (view && view.notes) || []) {
-    mount.append(el("div", { class: "task-row pending" },
-      el("div", { class: "task-text", dir: "auto" }, ...inline(n.text), el("span", { class: "tag", text: "captured · unsynced" }))));
+    const row = el("div", { class: "task-row pending" },
+      el("div", { class: "task-text", dir: "auto" }, ...inline(n.text),
+        el("span", { class: "tag", text: n.synced ? "captured · awaiting confirm" : "captured · unsynced" })));
+    if (n.synced === 0 && n.key) {
+      row.append(el("button", { class: "task-cancel", title: "Cancel — remove this un-synced note",
+        "aria-label": "cancel note", onclick: () => actions.cancelLocal(n.key), text: "×" }));
+    }
+    mount.append(row);
   }
 }

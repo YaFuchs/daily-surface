@@ -23,7 +23,9 @@ export function reduce(snapshot, localEvents) {
     switch (e.type) {
       case "task_done": {
         const t = byId.get(e.task_id);
-        if (t) { t.status = "done"; t._localPending = true; }
+        // _doneSeq lets the app map this completion to its outbox row, so an un-synced "done"
+        // can be undone before it reaches the Mac (DEC-023b — drop the task_done event).
+        if (t) { t.status = "done"; t._localPending = true; t._doneSeq = e.seq; }
         break;
       }
       case "task_deferred": {
@@ -32,10 +34,12 @@ export function reduce(snapshot, localEvents) {
         break;
       }
       case "task_added":
-        addedTasks.push({ text: e.text, project: e.project, ts: e.ts, _pending: true });
+        // seq lets the app map this overlay back to its outbox row (key + sync state) so an
+        // un-synced add can be cancelled locally before it reaches the Mac (db.deleteEvent).
+        addedTasks.push({ text: e.text, project: e.project, ts: e.ts, seq: e.seq, _pending: true });
         break;
       case "note_added":
-        notes.push({ text: e.text, ts: e.ts, _pending: true });
+        notes.push({ text: e.text, ts: e.ts, seq: e.seq, _pending: true });
         break;
       case "journal_field_set":
         (journalPresence[e.section] || (journalPresence[e.section] = {}))[e.field] = !!e.present;
@@ -47,7 +51,8 @@ export function reduce(snapshot, localEvents) {
         break;
     }
   }
-  return { plan: snapshot.plan, tasks, addedTasks, notes, journalPresence, closed };
+  return { plan: snapshot.plan, tasks, addedTasks, notes, journalPresence, closed,
+           today: Array.isArray(snapshot.today) ? snapshot.today : [] };  // Phase 2: plan-selected focus ids (DEC-021 §6)
 }
 
 // Returns { kept, newLastSeen }. lastSeen is a persisted per-device high-water that only advances.

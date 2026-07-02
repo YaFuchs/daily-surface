@@ -3,7 +3,7 @@
 // the access key must never be cached). Relative URLs so the SAME shell runs on localhost (test)
 // and the GitHub Pages path (prod) with no rebuild (critique nice-to-have).
 
-const CACHE = "daily-surface-v1";
+const CACHE = "daily-surface-v2";
 const SHELL = [
   "./", "./index.html", "./app.css", "./manifest.webmanifest", "./icon.svg",
   "./app.js", "./ui.js", "./journal.js", "./events.js", "./journal_staging.js", "./reducer.js",
@@ -26,11 +26,12 @@ self.addEventListener("fetch", (e) => {
   if (url.hostname === "api.github.com") return;             // pass through — never cache the API
   if (e.request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;           // only own-origin shell assets
+  // NETWORK-FIRST for the shell: when online, always serve (and re-cache) the freshest app code so
+  // updates land on the next open with no cache-version dance; fall back to cache only when offline.
   e.respondWith(
-    caches.match(e.request).then((hit) =>
-      hit || fetch(e.request).then((resp) => {
-        if (resp.ok) { const copy = resp.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
-        return resp;
-      }).catch(() => caches.match("./index.html")))
+    fetch(e.request).then((resp) => {
+      if (resp.ok) { const copy = resp.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
+      return resp;
+    }).catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html")))
   );
 });

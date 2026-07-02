@@ -63,9 +63,20 @@ body {
 .task-row.deferred .task-text { color: var(--muted); }
 .task-defer { flex: none; background: transparent; border: 1px solid var(--border); border-radius: 8px;
   color: var(--muted); min-width: 38px; height: 32px; cursor: pointer; }
+.task-cancel { flex: none; background: transparent; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); min-width: 32px; height: 32px; font-size: 16px; line-height: 1; cursor: pointer; }
 .tag { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-dim);
   border-radius: 6px; padding: 0 6px; margin-inline-start: 6px; vertical-align: middle; }
 .task-row.pending .task-text { color: var(--muted); }
+
+/* Phase 2 — Today vs Backlog (DEC-021 §6) */
+.task-today-h { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-weight: 700; margin: 2px 0 6px; }
+.backlog { margin-top: 10px; border-top: 1px solid var(--border); }
+.backlog > summary.backlog-sum { list-style: none; cursor: pointer; color: var(--muted); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 700; padding: 10px 0 4px; }
+.backlog-sum::-webkit-details-marker { display: none; }
+.backlog-sum::before { content: "▸ "; }
+.backlog[open] .backlog-sum::before { content: "▾ "; }
 
 .add-row { display: flex; gap: 8px; margin-top: 10px; }
 .add-input, .note-input, .jr-text, .settings-card input {

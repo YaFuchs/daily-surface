@@ -25,6 +25,28 @@ async function loadState() {
   state.rows = await db.allEvents();
   state.events = state.rows.map((r) => r.event);
   state.view = reduce(state.snapshot || { tasks: [] }, state.events);
+  // Annotate optimistic overlays with their outbox row (key + sync state) so the UI can offer a
+  // pre-sync cancel: a local-only delete of an un-synced (synced===0) add/note. Once a row is
+  // pushed (synced===1) it has left for the Mac and can no longer be retracted from the phone.
+  const rowBySeq = new Map(state.rows.map((r) => [r.event.seq, r]));
+  for (const item of [...state.view.addedTasks, ...state.view.notes]) {
+    const row = rowBySeq.get(item.seq);
+    item.key = row ? row.key : null;
+    item.synced = row ? row.synced : 0;
+  }
+  // Annotate locally-completed tasks with the outbox row of their task_done event, so an un-synced
+  // completion can offer an undo (tap to drop that event → reverts to open). DEC-023(b).
+  for (const t of state.view.tasks) {
+    if (t._doneSeq != null) {
+      const row = rowBySeq.get(t._doneSeq);
+      t._doneKey = row ? row.key : null;
+      t._doneSynced = row ? row.synced : 0;
+    }
+  }
+  // Load the cached plan markdown that matches the CURRENT snapshot's plan-day (not the wall-clock
+  // date — the evening-primary plan is tomorrow's), so a reopen/refresh shows the right plan.
+  const pdate = state.snapshot && state.snapshot.plan && state.snapshot.plan.date;
+  if (pdate) { const c = await db.meta.get("planMarkdown"); if (c && c.day === pdate) state.plan = c.md; }
 }
 
 // "unsynced" = not yet pushed (alarming); "awaiting" = pushed but the Mac has not yet folded+acked
@@ -55,6 +77,16 @@ const actions = {
   async deferTask(taskId) { await outbox.emit("task_deferred", { task_id: taskId, when: addDays(day(), 1) }, day()); await refresh(); },
   async addTask(text) { await outbox.emit("task_added", { text, project: "inbox" }, day()); await refresh(); },
   async addNote(text) { await outbox.emit("note_added", { text }, day()); await refresh(); },
+  // Local-only cancel of an un-synced add/note (the only reversible action pre-DEC-024): drop the
+  // event from the outbox before it is pushed. Re-checks synced===0 at tap time so it can never
+  // delete a row already on its way to the Mac (which the fold would still apply — a phantom).
+  async cancelLocal(key) {
+    if (!key) return;
+    const row = await db.get("outbox", key);
+    if (!row || row.synced !== 0) return;
+    await db.deleteEvent(key);
+    await refresh();
+  },
   async setJournal(section, field, value) {
     // Update ONLY the header chip on a present-flip — never re-render the journal panel, or the
     // focused textarea (caret + soft keyboard) is destroyed mid-sentence (must-fix #2).
@@ -75,7 +107,7 @@ async function doSync() {
   try {
     const res = await sync.syncNow();
     state.syncState = res.ok ? "idle" : "error";
-    await cachePlan();
+    await cachePlan(res.snapshot);
     if (!res.ok && res.errors.length) console.warn("sync errors", res.errors);
     // Connected, but the plan file was not found = wrong repo/branch (the #1 setup slip — a
     // case-mismatched branch). Tell the user exactly where to look instead of silently doing nothing.
@@ -89,11 +121,17 @@ async function doSync() {
 }
 
 // Fetch + cache the plan markdown (private repo, via the Contents API) for the plan panel.
-async function cachePlan() {
-  const src = state.snapshot && state.snapshot.plan && state.snapshot.plan.source;
+// Takes the snapshot EXPLICITLY — the freshly-pulled one from syncNow. Reading state.snapshot here
+// was the bug: during a sync it is still the PREVIOUS day's snapshot (refresh reloads it only
+// afterwards), so the panel fetched yesterday's plan even though the date had advanced. Keyed by
+// the plan's own date (the evening-primary plan is tomorrow's, not the wall-clock day).
+async function cachePlan(snapshot) {
+  const snap = snapshot || state.snapshot;
+  const src = snap && snap.plan && snap.plan.source;
+  const pdate = snap && snap.plan && snap.plan.date;
   if (!src) return;
-  try { const f = await getFile(src); if (f.text) { state.plan = f.text; await db.meta.set("planMarkdown", { day: day(), md: f.text }); } }
-  catch { const c = await db.meta.get("planMarkdown"); if (c && c.day === day()) state.plan = c.md; }
+  try { const f = await getFile(src); if (f.text) { state.plan = f.text; await db.meta.set("planMarkdown", { day: pdate, md: f.text }); } }
+  catch { const c = await db.meta.get("planMarkdown"); if (c && c.day === pdate) state.plan = c.md; }
 }
 
 // ---- settings (repo config + PAT) -----------------------------------------------------------
@@ -126,11 +164,10 @@ async function boot() {
   window.addEventListener("online", () => { state.online = true; refresh(); });
   window.addEventListener("offline", () => { state.online = false; refresh(); });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
-  const c = await db.meta.get("planMarkdown"); if (c && c.day === today()) state.plan = c.md;
+  await refresh();   // loadState() loads the cached plan that matches the snapshot's plan-day
   if (!state.plan && !(await secrets.hasPat())) {        // dev/offline: show the bundled sample plan
-    try { const r = await fetch("./plan.fixture.md", { cache: "no-store" }); if (r.ok) state.plan = await r.text(); } catch { /* none */ }
+    try { const r = await fetch("./plan.fixture.md", { cache: "no-store" }); if (r.ok) { state.plan = await r.text(); renderPlan($("plan-mount"), state.plan, state.view); } } catch { /* none */ }
   }
-  await refresh();
   if (!(await secrets.hasPat())) openSettings("Welcome. Connect your repo to sync (your data stays private).");
 }
 

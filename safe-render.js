@@ -38,7 +38,7 @@ export function inline(str) {
 // unordered lists, the day-shape pipe table, blockquotes, hr, paragraphs). DOM-built; no innerHTML.
 export function renderMarkdown(md) {
   const frag = document.createDocumentFragment();
-  const lines = String(md).replace(/\r\n/g, "\n").split("\n");
+  const lines = String(md).replace(/\r\n/g, "\n").replace(/[ \t]*<!--[\s\S]*?-->/g, "").split("\n"); // strip HTML comments (planner today-markers) — never shown
   let i = 0;
   const flushTable = (rows) => {
     const table = el("table");

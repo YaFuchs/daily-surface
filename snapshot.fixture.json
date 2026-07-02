@@ -1,6 +1,6 @@
 {
   "_comment": "SYNTHETIC demo data only — this file is the no-key offline fallback and the public shell shows it before a real sync, so it must contain NO real tasks/journal. The real snapshot is fetched from the private repo via the access key at runtime. Safe to publish.",
-  "schema_version": 1,
+  "schema_version": 2,
   "generated_at": "2026-01-01T08:00:00+02:00",
   "plan": { "date": "2026-01-01", "source": "surface/pwa/plan.fixture.md", "html": "plans/today.html" },
   "tasks": [
@@ -10,6 +10,7 @@
     { "id": "demo04", "text": "Capture a quick note below", "project": "demo", "priority": "P2", "status": "open" },
     { "id": null, "text": "A task with no id yet — done stays disabled until your Mac mints one", "project": "demo", "priority": "P2", "status": "open" }
   ],
+  "today": ["demo01", "demo02"],
   "journal_schema": {
     "schema_version": "demo",
     "source": "demo",

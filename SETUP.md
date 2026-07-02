@@ -35,6 +35,12 @@ bash surface/pwa/tests/test_pwa_backend_e2e.sh                # real engine -> r
 
 Nothing below is automated; each step is yours.
 
+> ⚠️ **Every time `surface/pwa/*` changes** — not just the first go-live — merging that PR into
+> `personal-os` does **NOT** update your phone. The hosted shell is a **separate public repo**;
+> the phone always runs whatever is on *that* repo, however stale. Re-run step 2's deploy command
+> after **every** merge that touches the PWA. (`ship.sh` reminds you when a PR it opens touches
+> `surface/pwa/`, but it can't detect a merge you make some other way — e.g. on github.com.)
+
 1. **Mint the real PAT** — fine-grained, **`personal-os` only**, **Contents: Read and write** and
    nothing else, 90-day expiry. Verify the token summary reads exactly that. (Full rationale +
    rotation/revocation runbook: [../SECURITY.md](../SECURITY.md).)
