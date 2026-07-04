@@ -3,6 +3,7 @@
 // mutation calls an action on the shared `actions` object (which emits an event + re-renders).
 
 import { el, inline, renderMarkdown } from "./safe-render.js";
+import { scoreboardText } from "./reducer.js";
 
 function freshness(lastSynced) {
   if (!lastSynced) return { cls: "danger", label: "never synced" };
@@ -13,7 +14,7 @@ function freshness(lastSynced) {
 }
 const rel = (h) => (h < 1 ? `${Math.max(1, Math.round(h * 60))}m ago` : `${Math.round(h)}h ago`);
 
-export function renderHeader(mount, { day, lastSynced, unsynced, awaiting, syncState, online }, actions) {
+export function renderHeader(mount, { day, lastSynced, unsynced, awaiting, syncState, online, closed, scoreboard }, actions) {
   const f = freshness(lastSynced);
   mount.replaceChildren(
     el("div", { class: "hd-row" },
@@ -21,6 +22,15 @@ export function renderHeader(mount, { day, lastSynced, unsynced, awaiting, syncS
       el("span", { class: `chip ${online ? f.cls : "danger"}`, text: online ? f.label : "offline" }),
       unsynced ? el("span", { class: "chip pending", text: `${unsynced} unsynced` }) : null,
       awaiting ? el("span", { class: "chip", text: `${awaiting} awaiting confirm` }) : null,
+      // The Daily Scoreboard recap (DEC-038): the day's report — the accountability moment the
+      // close IS. Shown once the day is closed; recomputed from view state on every render, so
+      // it shares the closed chip's durable-until-ack lifetime (reload-surviving, no new state).
+      closed && scoreboard ? el("span", { class: "chip fresh", text: `Today: ${scoreboardText(scoreboard)}` }) : null,
+      // Durable, re-render-surviving close acknowledgment (driven by view.closed, i.e. an actual
+      // local day_closed event — not a transient toast, so a reload/re-render still shows it):
+      // honest about the async, Mac-dependent payoff. Also IS the duplicate-close guard — once
+      // closed, the button below is disabled, so a second tap can't emit another day_closed.
+      closed ? el("span", { class: "chip fresh", text: "Tomorrow's plan generates on your Mac this evening — Sync later to see it" }) : null,
     ),
     el("div", { class: "hd-actions" },
       el("button", {
@@ -28,8 +38,8 @@ export function renderHeader(mount, { day, lastSynced, unsynced, awaiting, syncS
         onclick: () => actions.syncNow(),
         text: syncState === "syncing" ? "Syncing…" : syncState === "error" ? "Sync failed — retry" : "Sync now",
       }),
-      el("button", { class: "btn ghost", disabled: syncState === "syncing", onclick: () => actions.closeDay(),
-        text: "Close the day" }),
+      el("button", { class: "btn ghost", disabled: syncState === "syncing" || closed, onclick: () => actions.closeDay(),
+        text: closed ? "Day closed ✓" : "Close the day" }),
     ),
   );
 }

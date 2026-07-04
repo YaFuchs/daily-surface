@@ -5,7 +5,7 @@
 
 import * as db from "./db.js";
 import * as outbox from "./outbox.js";
-import { reduce } from "./reducer.js";
+import { reduce, computeScoreboard, scoreboardText } from "./reducer.js";
 import * as sync from "./sync.js";
 import * as secrets from "./secrets.js";
 import { getFile } from "./github.js";
@@ -54,7 +54,12 @@ async function loadState() {
 async function renderHeaderOnly() {
   const unsynced = state.rows.filter((r) => r.synced === 0).length;
   const awaiting = state.rows.filter((r) => r.synced === 1).length;
-  renderHeader($("header-mount"), { day: day(), lastSynced: await sync.lastSynced(), unsynced, awaiting, syncState: state.syncState, online: state.online }, actions);
+  // The recap chip only while the snapshot still belongs to the day that was closed: if a NEW
+  // day's snapshot lands before day_closed is acked (offline close + pull-before-push), the
+  // numbers would silently recompute against the new plan — hide instead (review, DEC-038).
+  const sameDay = state.view?.closed && state.view.closedDay === state.snapshot?.plan?.date;
+  renderHeader($("header-mount"), { day: day(), lastSynced: await sync.lastSynced(), unsynced, awaiting, syncState: state.syncState, online: state.online, closed: state.view?.closed,
+    scoreboard: sameDay ? computeScoreboard(state.view) : null }, actions);
 }
 
 async function loadFixture() {
@@ -95,8 +100,21 @@ const actions = {
   },
   async syncNow() { await doSync(); },
   async closeDay() {
-    if (!confirm(`Close ${day()} and hand the baton to your Mac? Tomorrow's plan generates tonight.`)) return;
+    // Guard against a duplicate day_closed (2026-07-04 fix): the button is disabled once closed,
+    // but this covers a race (a stale click firing just before the disabling re-render lands).
+    // The server already de-dupes (fold idempotency + evening_close.sh's high-water mark), but a
+    // 2nd emit still triggers a redundant regeneration and leaves a pending event on the baton.
+    if (state.view?.closed) return;
+    // The Daily Scoreboard (DEC-038): closing IS the report-back moment — lead the confirm with
+    // today's committed-vs-done score (quiet on days the plan committed no tracked tasks).
+    const sb = computeScoreboard(state.view);
+    const report = sb ? `Today's report: ${scoreboardText(sb)}.\n\n` : "";
+    if (!confirm(`${report}Close ${day()} and hand the baton to your Mac? Tomorrow's plan generates tonight.`)) return;
     await outbox.emit("day_closed", { plan_date: addDays(day(), 1) }, day());
+    // Immediate, local, durable feedback — independent of doSync's network step (which early-
+    // returns without refreshing if no PAT is configured yet): state.view.closed flips as soon as
+    // this event is read back from the outbox, disabling the button and showing the acknowledgment.
+    await refresh();
     await doSync();
   },
 };

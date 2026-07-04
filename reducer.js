@@ -17,6 +17,7 @@ export function reduce(snapshot, localEvents) {
   const notes = [];
   const journalPresence = {};            // section -> { field -> present } (LWW by seq)
   let closed = false;
+  let closedDay = null;                  // which day the un-acked day_closed belongs to (DEC-038)
 
   const ordered = [...localEvents].sort((a, b) => (a.seq || 0) - (b.seq || 0));
   for (const e of ordered) {
@@ -46,13 +47,36 @@ export function reduce(snapshot, localEvents) {
         break;
       case "day_closed":
         closed = true;
+        closedDay = e.day || null;
         break;
       default:
         break;
     }
   }
-  return { plan: snapshot.plan, tasks, addedTasks, notes, journalPresence, closed,
+  return { plan: snapshot.plan, tasks, addedTasks, notes, journalPresence, closed, closedDay,
            today: Array.isArray(snapshot.today) ? snapshot.today : [] };  // Phase 2: plan-selected focus ids (DEC-021 §6)
+}
+
+// computeScoreboard(view): the Daily Scoreboard numbers for the close-the-day recap (DEC-038).
+// Pure and display-only — counts the plan-committed ids (view.today) against the overlaid task
+// state at THIS moment: "done" = the local task_done overlay (the snapshot itself never carries
+// done tasks — DEC-023); everything else — open, deferred, or missing from tasks[] — still rolls.
+// Null when the plan committed no tracked tasks that day, so the UI stays quiet.
+export function computeScoreboard(view) {
+  const ids = (view && Array.isArray(view.today)) ? view.today : [];
+  if (!ids.length) return null;
+  const byId = new Map(((view && view.tasks) || []).filter((t) => t.id).map((t) => [t.id, t]));
+  let done = 0;
+  for (const id of ids) { const t = byId.get(id); if (t && t.status === "done") done++; }
+  return { committed: ids.length, done, rolls: ids.length - done };
+}
+
+// One phrasing for the scoreboard everywhere (header chip + the close-confirm dialog). Lives here
+// beside the numbers so the contract tests cover copy + counts together; ui/app import it.
+export function scoreboardText(s) {
+  if (!s) return null;
+  if (s.rolls === 0) return `All ${s.committed} committed done ✓`;
+  return `${s.done} of ${s.committed} committed done${s.done ? " ✓" : ""} · ${s.rolls} roll${s.rolls === 1 ? "s" : ""} to tomorrow`;
 }
 
 // Returns { kept, newLastSeen }. lastSeen is a persisted per-device high-water that only advances.
