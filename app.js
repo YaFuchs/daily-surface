@@ -36,7 +36,8 @@ async function loadState() {
   }
   // Annotate locally-completed tasks with the outbox row of their task_done event, so an un-synced
   // completion can offer an undo (tap to drop that event → reverts to open). DEC-023(b).
-  for (const t of state.view.tasks) {
+  // Pending added rows completed via ref_evt (DEC-039) get the same treatment.
+  for (const t of [...state.view.tasks, ...state.view.addedTasks]) {
     if (t._doneSeq != null) {
       const row = rowBySeq.get(t._doneSeq);
       t._doneKey = row ? row.key : null;
@@ -79,6 +80,9 @@ async function refresh() {
 
 const actions = {
   async markDone(taskId) { await outbox.emit("task_done", { task_id: taskId }, day()); await refresh(); },
+  // DEC-039: complete a just-captured task by its origin task_added event id — works instantly,
+  // offline, before the Mac ever minted the task an id (the capture dead-zone fix).
+  async markDoneRef(evtId) { await outbox.emit("task_done", { ref_evt: evtId }, day()); await refresh(); },
   async deferTask(taskId) { await outbox.emit("task_deferred", { task_id: taskId, when: addDays(day(), 1) }, day()); await refresh(); },
   async addTask(text) { await outbox.emit("task_added", { text, project: "inbox" }, day()); await refresh(); },
   async addNote(text) { await outbox.emit("note_added", { text }, day()); await refresh(); },

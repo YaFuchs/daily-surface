@@ -12,6 +12,7 @@
 export const SCHEMA_V = 1;
 export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;          // mirrors fold.py _DAY_RE
 export const TASKID_RE = /^[0-9a-z]{6}$/;             // mirrors fold.py _TASKID_RE
+export const EVTID_RE = /^[A-Za-z0-9._:-]{1,80}$/;    // mirrors fold.py _EVTID_RE (DEC-032/039)
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -54,7 +55,14 @@ function envelope(type, ctx, idemSubject) {
 
 // ---- the six verbs (exact fields fold.py consumes) -----------------------------------------
 
-export function taskDone(ctx, { task_id }) {
+export function taskDone(ctx, { task_id, ref_evt }) {
+  // DEC-039: exactly one address — a minted 6-char task_id, OR ref_evt (the origin task_added
+  // event's own id) so a just-captured task is completable before the Mac ever mints its id.
+  if (task_id != null && ref_evt != null) throw new Error("taskDone: pass task_id OR ref_evt, not both");
+  if (ref_evt != null) {
+    if (!EVTID_RE.test(String(ref_evt))) throw new Error(`taskDone: bad ref_evt ${ref_evt}`);
+    return { ...envelope("task_done", ctx, ref_evt), ref_evt };
+  }
   if (!TASKID_RE.test(String(task_id || ""))) throw new Error(`taskDone: bad task_id ${task_id}`);
   return { ...envelope("task_done", ctx, task_id), task_id };
 }

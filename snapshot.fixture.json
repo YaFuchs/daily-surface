@@ -1,14 +1,14 @@
 {
   "_comment": "SYNTHETIC demo data only — this file is the no-key offline fallback and the public shell shows it before a real sync, so it must contain NO real tasks/journal. The real snapshot is fetched from the private repo via the access key at runtime. Safe to publish.",
-  "schema_version": 2,
+  "schema_version": 3,
   "generated_at": "2026-01-01T08:00:00+02:00",
   "plan": { "date": "2026-01-01", "source": "surface/pwa/plan.fixture.md", "html": "plans/today.html" },
   "tasks": [
-    { "id": "demo01", "text": "Read today's plan and pick your one thing", "project": "demo", "priority": "P0", "status": "open" },
-    { "id": "demo02", "text": "Mark a task done — it saves instantly, even offline", "project": "demo", "priority": "P1", "status": "open" },
-    { "id": "demo03", "text": "Defer a task to tomorrow with the skip button", "project": "demo", "priority": "P1", "status": "open" },
-    { "id": "demo04", "text": "Capture a quick note below", "project": "demo", "priority": "P2", "status": "open" },
-    { "id": null, "text": "A task with no id yet — done stays disabled until your Mac mints one", "project": "demo", "priority": "P2", "status": "open" }
+    { "id": "demo01", "text": "Read today's plan and pick your one thing", "project": "demo", "priority": "P0", "status": "open", "origin": null },
+    { "id": "demo02", "text": "Mark a task done — it saves instantly, even offline", "project": "demo", "priority": "P1", "status": "open", "origin": null },
+    { "id": "demo03", "text": "Defer a task to tomorrow with the skip button", "project": "demo", "priority": "P1", "status": "open", "origin": null },
+    { "id": "demo04", "text": "Capture a quick note below", "project": "demo", "priority": "P2", "status": "open", "origin": null },
+    { "id": null, "text": "A filed capture with no id yet — still completable by its origin event", "project": "demo", "priority": "P2", "status": "open", "origin": "evt_2026-01-01T07:55:00.000Z_d3m0" }
   ],
   "today": ["demo01", "demo02"],
   "journal_schema": {

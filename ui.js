@@ -85,13 +85,26 @@ export function renderTasks(mount, view, actions) {
   }
 
   for (const a of view.addedTasks) {
-    const row = el("div", { class: "task-row pending" },
-      el("div", { class: "task-text", dir: "auto" }, ...inline(a.text),
-        el("span", { class: "tag", text: a.synced ? "new · awaiting confirm" : "new · unsynced" })),
-    );
-    // A just-added task has no stable id and no undo/edit verb (DEC-024 pending). The one thing it
-    // CAN do before sync is be cancelled — drop the un-synced event from the outbox.
-    if (a.synced === 0 && a.key) {
+    // DEC-039: a just-added task is completable IMMEDIATELY — the checkbox emits task_done
+    // addressed by the add's own event id (ref_evt); the fold joins on the <!--evt:--> marker
+    // it stamps on the filed line. No minted id, no sync round-trip needed.
+    const done = !!a.done;
+    const undoable = done && a._doneSynced === 0 && a._doneKey;   // DEC-023b: un-synced → tap to undo
+    const row = el("div", { class: `task-row pending${done ? " done" : ""}` });
+    row.append(el("button", {
+      class: "task-check",
+      "aria-label": done ? (undoable ? "undo done" : "done") : "mark done",
+      disabled: (done && !undoable) || !a.evtId,
+      title: undoable ? "Tap to undo — not synced yet" : "",
+      onclick: () => { if (undoable) actions.cancelLocal(a._doneKey); else if (!done) actions.markDoneRef(a.evtId); },
+      text: done ? "✓" : "○",
+    }));
+    row.append(el("div", { class: "task-text", dir: "auto" }, ...inline(a.text),
+      el("span", { class: "tag", text: a.synced ? "new · awaiting confirm" : "new · unsynced" })));
+    // Pre-sync cancel of the ADD stays available only while the row is still open: once a
+    // ref-done points at it, cancelling the add would orphan that done and wedge the ack
+    // watermark — undo the completion first, then the × returns.
+    if (!done && a.synced === 0 && a.key) {
       row.append(el("button", { class: "task-cancel", title: "Cancel — remove this un-synced task",
         "aria-label": "cancel task", onclick: () => actions.cancelLocal(a.key), text: "×" }));
     }
@@ -118,14 +131,17 @@ function taskRow(t, actions) {
   const done = t.status === "done";
   const deferred = t.status === "deferred";
   const noId = !t.id;
+  // DEC-039: a filed-but-not-yet-minted capture (id null, origin = its task_added event id —
+  // e.g. mint skipped on a held baton) is still completable, addressed by that origin event.
+  const refable = noId && !!t.origin;
   const undoable = done && t._doneSynced === 0 && t._doneKey;   // un-synced completion → tap to undo (DEC-023b)
   const row = el("div", { class: `task-row${done ? " done" : ""}${deferred ? " deferred" : ""}` });
   const checkbox = el("button", {
     class: "task-check",
     "aria-label": done ? (undoable ? "undo done" : "done") : "mark done",
-    disabled: noId || (done && !undoable),
-    title: noId ? "No stable id yet — sync first" : undoable ? "Tap to undo — not synced yet" : "",
-    onclick: () => { if (undoable) actions.cancelLocal(t._doneKey); else if (!done) actions.markDone(t.id); },
+    disabled: (noId && !refable) || (done && !undoable),
+    title: noId && !refable ? "No stable id yet — sync first" : undoable ? "Tap to undo — not synced yet" : "",
+    onclick: () => { if (undoable) actions.cancelLocal(t._doneKey); else if (!done) (t.id ? actions.markDone(t.id) : actions.markDoneRef(t.origin)); },
     text: done ? "✓" : "○",
   });
   const text = el("div", { class: "task-text", dir: "auto" }, ...inline(t.text));

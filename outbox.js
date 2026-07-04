@@ -4,7 +4,7 @@
 
 import * as db from "./db.js";
 import {
-  taskDone, taskDeferred, taskAdded, noteAdded, journalFieldSet, dayClosed, TASKID_RE,
+  taskDone, taskDeferred, taskAdded, noteAdded, journalFieldSet, dayClosed, TASKID_RE, EVTID_RE,
 } from "./events.js";
 import { isPresent } from "./journal_staging.js";
 
@@ -27,10 +27,18 @@ async function device() {
 export async function emit(type, fields, day) {
   const builder = BUILDERS[type];
   if (!builder) throw new Error(`unknown verb ${type}`);
-  // HARD invariant (critique should-fix): never mint a task event for a row with no stable id —
+  // HARD invariant (critique should-fix): never mint a task event with no valid address —
   // fold would orphan it, never ack it, and WEDGE the device watermark forever (DEC-019 trade-off).
-  if ((type === "task_done" || type === "task_deferred") && !TASKID_RE.test(String(fields.task_id || ""))) {
+  // task_done may alternatively address the ORIGIN task_added event (ref_evt, DEC-039) — that
+  // references our own prior event, which the fold files before the done ever applies.
+  if (type === "task_deferred" && !TASKID_RE.test(String(fields.task_id || ""))) {
     throw new Error(`refusing to ${type}: this task has no stable id yet (sync first)`);
+  }
+  if (type === "task_done") {
+    const byRef = fields.ref_evt != null;
+    if (byRef ? !EVTID_RE.test(String(fields.ref_evt)) : !TASKID_RE.test(String(fields.task_id || ""))) {
+      throw new Error("refusing to task_done: no valid task_id or ref_evt address");
+    }
   }
   const dev = await device();
   return db.appendEvent(dev, (seq) =>

@@ -23,6 +23,18 @@ export function reduce(snapshot, localEvents) {
   for (const e of ordered) {
     switch (e.type) {
       case "task_done": {
+        // DEC-039: a completion may address the ORIGIN task_added event (ref_evt) instead of a
+        // minted id. Prefer the still-pending local add row (same batch, the common case); else
+        // the snapshot task that materialized from that add (joined via tasks[].origin) — so a
+        // ref-done emitted offline still shows done after the add syncs, folds, and re-appears
+        // with a real id. _doneSeq maps the completion to its outbox row for the DEC-023b undo.
+        if (e.ref_evt) {
+          const row = addedTasks.find((a) => a.evtId === e.ref_evt);
+          if (row) { row.done = true; row._doneSeq = e.seq; break; }
+          const t = tasks.find((x) => x.origin && x.origin === e.ref_evt);
+          if (t) { t.status = "done"; t._localPending = true; t._doneSeq = e.seq; }
+          break;
+        }
         const t = byId.get(e.task_id);
         // _doneSeq lets the app map this completion to its outbox row, so an un-synced "done"
         // can be undone before it reaches the Mac (DEC-023b — drop the task_done event).
@@ -37,7 +49,9 @@ export function reduce(snapshot, localEvents) {
       case "task_added":
         // seq lets the app map this overlay back to its outbox row (key + sync state) so an
         // un-synced add can be cancelled locally before it reaches the Mac (db.deleteEvent).
-        addedTasks.push({ text: e.text, project: e.project, ts: e.ts, seq: e.seq, _pending: true });
+        // evtId (the event's own id) is the row's DEC-039 address: a later task_done{ref_evt}
+        // marks it done here, and the fold joins on the same id via the filed <!--evt:--> marker.
+        addedTasks.push({ text: e.text, project: e.project, ts: e.ts, seq: e.seq, evtId: e.id, _pending: true });
         break;
       case "note_added":
         notes.push({ text: e.text, ts: e.ts, seq: e.seq, _pending: true });
