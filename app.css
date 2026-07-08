@@ -52,6 +52,13 @@ body {
 .plan-body th, .plan-body td { border: 1px solid var(--border); padding: 5px 8px; text-align: start; vertical-align: top; }
 .plan-body a { color: var(--accent); }
 
+/* DEC-040 — week plan panel: same summary/marker convention as .backlog, collapsed by default. */
+.week-sum { list-style: none; cursor: pointer; margin: 0; }
+.week-sum::-webkit-details-marker { display: none; }
+.week-sum::before { content: "▸ "; }
+.week-panel[open] .week-sum::before { content: "▾ "; }
+.week-panel .plan-body { margin-top: 10px; }
+
 .task-group-h { font-size: 12px; color: var(--muted); margin: 10px 0 4px; font-weight: 700; }
 .task-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
 .task-row:first-of-type { border-top: 0; }
@@ -68,6 +75,10 @@ body {
 .tag { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-dim);
   border-radius: 6px; padding: 0 6px; margin-inline-start: 6px; vertical-align: middle; }
 .task-row.pending .task-text { color: var(--muted); }
+
+/* DEC-040 — long dev-backlog task text clamps to 2 lines; tap to expand/collapse. */
+.task-text.expandable { cursor: pointer; }
+.task-text.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* Phase 2 — Today vs Backlog (DEC-021 §6) */
 .task-today-h { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-weight: 700; margin: 2px 0 6px; }

@@ -10,11 +10,11 @@ import * as sync from "./sync.js";
 import * as secrets from "./secrets.js";
 import { getFile } from "./github.js";
 import { addDays } from "./events.js";
-import { renderHeader, renderPlan, renderTasks, renderCapture } from "./ui.js";
+import { renderHeader, renderPlan, renderWeek, renderTasks, renderCapture } from "./ui.js";
 import { renderJournal } from "./journal.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { snapshot: null, rows: [], events: [], view: null, plan: null, syncState: "idle", online: navigator.onLine };
+const state = { snapshot: null, rows: [], events: [], view: null, plan: null, week: null, syncState: "idle", online: navigator.onLine };
 
 function today() { return new Date().toLocaleDateString("en-CA"); } // YYYY-MM-DD, local
 function day() { return (state.snapshot && state.snapshot.plan && state.snapshot.plan.date) || today(); }
@@ -48,6 +48,9 @@ async function loadState() {
   // date — the evening-primary plan is tomorrow's), so a reopen/refresh shows the right plan.
   const pdate = state.snapshot && state.snapshot.plan && state.snapshot.plan.date;
   if (pdate) { const c = await db.meta.get("planMarkdown"); if (c && c.day === pdate) state.plan = c.md; }
+  // Same, for the week plan (DEC-040): cached under its own key, keyed by ISO-week label.
+  const wdate = state.snapshot && state.snapshot.week && state.snapshot.week.date;
+  if (wdate) { const c = await db.meta.get("weekMarkdown"); if (c && c.week === wdate) state.week = c.md; }
 }
 
 // "unsynced" = not yet pushed (alarming); "awaiting" = pushed but the Mac has not yet folded+acked
@@ -72,6 +75,7 @@ async function refresh() {
   await loadState();
   await renderHeaderOnly();
   renderPlan($("plan-mount"), state.plan, state.view);
+  renderWeek($("week-mount"), state.week);
   renderTasks($("tasks-mount"), state.view, actions);
   renderCapture($("capture-mount"), state.view, actions);
   const prose = await outbox.proseFv(day());
@@ -130,6 +134,7 @@ async function doSync() {
     const res = await sync.syncNow();
     state.syncState = res.ok ? "idle" : "error";
     await cachePlan(res.snapshot);
+    await cacheWeek(res.snapshot);
     if (!res.ok && res.errors.length) console.warn("sync errors", res.errors);
     // Connected, but the plan file was not found = wrong repo/branch (the #1 setup slip — a
     // case-mismatched branch). Tell the user exactly where to look instead of silently doing nothing.
@@ -154,6 +159,17 @@ async function cachePlan(snapshot) {
   if (!src) return;
   try { const f = await getFile(src); if (f.text) { state.plan = f.text; await db.meta.set("planMarkdown", { day: pdate, md: f.text }); } }
   catch { const c = await db.meta.get("planMarkdown"); if (c && c.day === pdate) state.plan = c.md; }
+}
+
+// Same, for the week plan (DEC-040) — same mechanism, one field over: snapshot.week.source instead
+// of snapshot.plan.source, cached under its own IndexedDB key so a plan-day change never evicts it.
+async function cacheWeek(snapshot) {
+  const snap = snapshot || state.snapshot;
+  const src = snap && snap.week && snap.week.source;
+  const wdate = snap && snap.week && snap.week.date;
+  if (!src) return;
+  try { const f = await getFile(src); if (f.text) { state.week = f.text; await db.meta.set("weekMarkdown", { week: wdate, md: f.text }); } }
+  catch { const c = await db.meta.get("weekMarkdown"); if (c && c.week === wdate) state.week = c.md; }
 }
 
 // ---- settings (repo config + PAT) -----------------------------------------------------------
@@ -189,6 +205,9 @@ async function boot() {
   await refresh();   // loadState() loads the cached plan that matches the snapshot's plan-day
   if (!state.plan && !(await secrets.hasPat())) {        // dev/offline: show the bundled sample plan
     try { const r = await fetch("./plan.fixture.md", { cache: "no-store" }); if (r.ok) { state.plan = await r.text(); renderPlan($("plan-mount"), state.plan, state.view); } } catch { /* none */ }
+  }
+  if (!state.week && !(await secrets.hasPat())) {        // same, for the sample week plan
+    try { const r = await fetch("./week.fixture.md", { cache: "no-store" }); if (r.ok) { state.week = await r.text(); renderWeek($("week-mount"), state.week); } } catch { /* none */ }
   }
   if (!(await secrets.hasPat())) openSettings("Welcome. Connect your repo to sync (your data stays private).");
 }

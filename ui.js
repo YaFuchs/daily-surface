@@ -56,6 +56,23 @@ export function renderPlan(mount, planMarkdown, view) {
   }
 }
 
+// DEC-040: the week plan reaches the phone the same way the daily plan does (getFile + cache +
+// renderMarkdown) — just a second panel over a second file, no new mechanism. Collapsed by
+// default (a `details`) so the week's fuller markdown doesn't push today's tasks below the fold.
+export function renderWeek(mount, weekMarkdown) {
+  mount.replaceChildren();
+  const det = el("details", { class: "week-panel" });
+  det.append(el("summary", { class: "panel-h week-sum", text: "This week's plan" }));
+  if (weekMarkdown) {
+    const body = el("div", { class: "plan-body", dir: "auto" });
+    body.append(renderMarkdown(weekMarkdown));
+    det.append(body);
+  } else {
+    det.append(el("p", { class: "muted", text: "Week plan not cached offline." }));
+  }
+  mount.append(det);
+}
+
 export function renderTasks(mount, view, actions) {
   mount.replaceChildren(el("h2", { class: "panel-h", text: "Tasks" }));
 
@@ -144,7 +161,10 @@ function taskRow(t, actions) {
     onclick: () => { if (undoable) actions.cancelLocal(t._doneKey); else if (!done) (t.id ? actions.markDone(t.id) : actions.markDoneRef(t.origin)); },
     text: done ? "✓" : "○",
   });
-  const text = el("div", { class: "task-text", dir: "auto" }, ...inline(t.text));
+  // DEC-040: dev-backlog prose (globbed in from every projects/*/TASKS.md) can run much longer
+  // than a life-admin errand — clamp to 2 lines and let a tap expand/collapse the full text.
+  const text = el("div", { class: "task-text expandable clamp", dir: "auto" }, ...inline(t.text));
+  text.addEventListener("click", () => text.classList.toggle("clamp"));
   if (t._localPending) text.append(el("span", { class: "tag", text: "unsynced" }));
   if (deferred) text.append(el("span", { class: "tag", text: `→ ${t.deferredTo || "later"}` }));
   row.append(checkbox, text);

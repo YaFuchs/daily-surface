@@ -1,8 +1,9 @@
 {
   "_comment": "SYNTHETIC demo data only — this file is the no-key offline fallback and the public shell shows it before a real sync, so it must contain NO real tasks/journal. The real snapshot is fetched from the private repo via the access key at runtime. Safe to publish.",
-  "schema_version": 3,
+  "schema_version": 4,
   "generated_at": "2026-01-01T08:00:00+02:00",
   "plan": { "date": "2026-01-01", "source": "surface/pwa/plan.fixture.md", "html": "plans/today.html" },
+  "week": { "date": "2026-W01", "source": "surface/pwa/week.fixture.md" },
   "tasks": [
     { "id": "demo01", "text": "Read today's plan and pick your one thing", "project": "demo", "priority": "P0", "status": "open", "origin": null },
     { "id": "demo02", "text": "Mark a task done — it saves instantly, even offline", "project": "demo", "priority": "P1", "status": "open", "origin": null },
